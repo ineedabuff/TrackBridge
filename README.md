@@ -50,6 +50,15 @@ TrackBridge is a self-hosted email tracking platform inspired by mxHERO TotalTra
 - Generate and insert tracked links into Gmail compose windows
 - Quick dashboard access from Gmail and the extension popup
 
+## Sprint 6 scope
+
+- Analytics overview API at `/api/v1/analytics/overview`
+- Engagement rates for opens, clicks, and downloads
+- Seven-day activity trend
+- Recent activity timeline across all signal types
+- Top tracked items by event volume
+- Dashboard analytics panel with compact operational views
+
 ## Quick start
 
 1. Copy the environment file.
@@ -137,4 +146,5 @@ pnpm dev
 Change `TRACKBRIDGE_SECRET_KEY`, database credentials, `TRACKBRIDGE_DOMAIN`, `TRACKBRIDGE_ACME_EMAIL`, and `TRACKBRIDGE_PUBLIC_BASE_URL` before deployment. Caddy will manage HTTPS automatically when the domain points to the server and ports 80/443 are reachable.
 
 Tracked files are stored locally under `storage/attachments` by default. This path is mounted into the backend container and can later be replaced by an S3-compatible backend.
+
 

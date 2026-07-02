@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, dashboard, health, tracking
+from app.api.routes import analytics, auth, dashboard, health, tracking
 from app.core.config import get_settings
 from app.db.session import Base, engine
 from app.models import tracking as tracking_models  # noqa: F401
@@ -21,7 +21,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="TrackBridge API",
-    version="0.5.0",
+    version="0.6.0",
     description="Self-hosted email tracking API.",
     openapi_url="/openapi.json",
     docs_url="/docs",
@@ -40,6 +40,7 @@ app.add_middleware(
 app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(dashboard.router, prefix=settings.api_v1_prefix)
+app.include_router(analytics.router, prefix=settings.api_v1_prefix)
 app.include_router(tracking.email_router, prefix=settings.api_v1_prefix)
 app.include_router(tracking.link_router, prefix=settings.api_v1_prefix)
 app.include_router(tracking.attachment_router, prefix=settings.api_v1_prefix)

@@ -1,5 +1,6 @@
 import {
   Activity,
+  BarChart3,
   ArrowRight,
   Copy,
   Link2,
@@ -16,6 +17,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { MetricCard } from "./components/MetricCard";
 import {
+  AnalyticsOverview,
   AuthMode,
   DashboardSummary,
   TrackedAttachment,
@@ -24,6 +26,7 @@ import {
   User,
   authenticate,
   createTrackedAttachment,
+  getAnalyticsOverview,
   createTrackedEmail,
   createTrackedLink,
   getDashboardSummary,
@@ -48,6 +51,7 @@ function App() {
     return raw ? (JSON.parse(raw) as User) : null;
   });
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsOverview | null>(null);
   const [trackedEmails, setTrackedEmails] = useState<TrackedEmail[]>([]);
   const [trackedLinks, setTrackedLinks] = useState<TrackedLink[]>([]);
   const [trackedAttachments, setTrackedAttachments] = useState<TrackedAttachment[]>([]);
@@ -70,13 +74,15 @@ function App() {
   const title = useMemo(() => (mode === "register" ? "Create workspace" : "Sign in"), [mode]);
 
   const refreshTrackingData = useCallback(async (activeToken = token) => {
-    const [nextSummary, emails, links, attachments] = await Promise.all([
+    const [nextSummary, nextAnalytics, emails, links, attachments] = await Promise.all([
       getDashboardSummary(activeToken),
+      getAnalyticsOverview(activeToken),
       listTrackedEmails(activeToken),
       listTrackedLinks(activeToken),
       listTrackedAttachments(activeToken)
     ]);
     setSummary(nextSummary);
+    setAnalytics(nextAnalytics);
     setTrackedEmails(emails);
     setTrackedLinks(links);
     setTrackedAttachments(attachments);
@@ -222,6 +228,7 @@ function App() {
     setToken("");
     setUser(null);
     setSummary(null);
+    setAnalytics(null);
     setTrackedEmails([]);
     setTrackedLinks([]);
     setTrackedAttachments([]);
@@ -246,6 +253,7 @@ function App() {
             <a href="#tracking"><Radar size={18} /> Pixels</a>
             <a href="#clicks"><MousePointerClick size={18} /> Clicks</a>
             <a href="#attachments"><Paperclip size={18} /> Attachments</a>
+            <a href="#analytics"><BarChart3 size={18} /> Analytics</a>
             <a href="#mail"><MailCheck size={18} /> Campaigns</a>
             <a href="#security"><ShieldCheck size={18} /> Security</a>
           </nav>
@@ -254,9 +262,9 @@ function App() {
         <section className="dashboard" id="dashboard">
           <header className="dashboard-header">
             <div>
-              <span className="eyebrow">Sprint 4</span>
+              <span className="eyebrow">Sprint 6</span>
               <h1>Email tracking command center</h1>
-              <p>Pixels, click redirects, and tracked attachment downloads are live.</p>
+              <p>Analytics, timelines, rates, and signal trends are live.</p>
             </div>
             <button className="icon-button" type="button" onClick={logout} aria-label="Sign out">
               <LogOut size={18} />
@@ -288,6 +296,72 @@ function App() {
             ))}
           </section>
 
+
+          <section className="analytics-panel" id="analytics">
+            <div className="analytics-header">
+              <div>
+                <span className="eyebrow">Analytics</span>
+                <h2>Signal performance</h2>
+              </div>
+              <strong>{analytics?.totals.total_events ?? 0} events</strong>
+            </div>
+
+            <div className="rate-grid">
+              <article><span>Open rate</span><strong>{analytics?.rates.open_rate ?? 0}%</strong></article>
+              <article><span>Click rate</span><strong>{analytics?.rates.click_rate ?? 0}%</strong></article>
+              <article><span>Download rate</span><strong>{analytics?.rates.download_rate ?? 0}%</strong></article>
+            </div>
+
+            <div className="trend-chart" aria-label="Seven day activity chart">
+              {(analytics?.series ?? []).map((point) => {
+                const total = point.opens + point.clicks + point.downloads;
+                const maxTotal = Math.max(...(analytics?.series ?? [{ opens: 0, clicks: 0, downloads: 0 }]).map((item) => item.opens + item.clicks + item.downloads), 1);
+                return (
+                  <article key={point.date}>
+                    <div style={{ height: `${Math.max((total / maxTotal) * 100, total > 0 ? 8 : 0)}%` }} />
+                    <span>{new Date(`${point.date}T00:00:00`).toLocaleDateString(undefined, { weekday: "short" })}</span>
+                    <strong>{total}</strong>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="analytics-grid">
+              <article>
+                <h3>Recent activity</h3>
+                <div className="activity-list">
+                  {(analytics?.recent_activity ?? []).length === 0 ? (
+                    <p className="muted-copy">No activity yet.</p>
+                  ) : (
+                    analytics?.recent_activity.map((item) => (
+                      <div key={`${item.event_type}-${item.occurred_at}-${item.title}`}>
+                        <span>{item.event_type}</span>
+                        <strong>{item.title}</strong>
+                        <small>{item.target}</small>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </article>
+
+              <article>
+                <h3>Top items</h3>
+                <div className="activity-list">
+                  {(analytics?.top_items ?? []).length === 0 ? (
+                    <p className="muted-copy">No ranked items yet.</p>
+                  ) : (
+                    analytics?.top_items.map((item) => (
+                      <div key={`${item.item_type}-${item.title}-${item.target}`}>
+                        <span>{item.item_type}</span>
+                        <strong>{item.title}</strong>
+                        <small>{item.events} events</small>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </article>
+            </div>
+          </section>
           <section className="tracking-workbench" id="tracking">
             <form className="tracking-form" onSubmit={handleCreatePixel}>
               <div>
@@ -527,3 +601,4 @@ function App() {
 }
 
 export default App;
+

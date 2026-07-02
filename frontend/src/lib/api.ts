@@ -30,6 +30,42 @@ export type DashboardSummary = {
   users: number;
 };
 
+export type AnalyticsOverview = {
+  totals: {
+    tracked_emails: number;
+    tracked_links: number;
+    tracked_attachments: number;
+    opens: number;
+    clicks: number;
+    downloads: number;
+    total_events: number;
+  };
+  rates: {
+    open_rate: number;
+    click_rate: number;
+    download_rate: number;
+  };
+  series: Array<{
+    date: string;
+    opens: number;
+    clicks: number;
+    downloads: number;
+  }>;
+  recent_activity: Array<{
+    event_type: "open" | "click" | "download";
+    title: string;
+    target: string;
+    occurred_at: string;
+    ip_address: string | null;
+  }>;
+  top_items: Array<{
+    item_type: string;
+    title: string;
+    target: string;
+    events: number;
+  }>;
+};
+
 export type TrackedEmailCreate = {
   recipient_email: string;
   subject: string;
@@ -116,6 +152,14 @@ export function authenticate(mode: AuthMode, payload: AuthPayload): Promise<Auth
 
 export function getDashboardSummary(token: string): Promise<DashboardSummary> {
   return request<DashboardSummary>("/dashboard/summary", {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export function getAnalyticsOverview(token: string): Promise<AnalyticsOverview> {
+  return request<AnalyticsOverview>("/analytics/overview", {
     headers: {
       Authorization: `Bearer ${token}`
     }
