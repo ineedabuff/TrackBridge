@@ -30,6 +30,21 @@ export type DashboardSummary = {
   users: number;
 };
 
+export type TrackedEmailCreate = {
+  recipient_email: string;
+  subject: string;
+};
+
+export type TrackedEmail = {
+  id: string;
+  recipient_email: string;
+  subject: string;
+  tracking_pixel_url: string;
+  pixel_html: string;
+  opens: number;
+  created_at: string;
+};
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -57,6 +72,27 @@ export function authenticate(mode: AuthMode, payload: AuthPayload): Promise<Auth
 
 export function getDashboardSummary(token: string): Promise<DashboardSummary> {
   return request<DashboardSummary>("/dashboard/summary", {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export function createTrackedEmail(
+  token: string,
+  payload: TrackedEmailCreate
+): Promise<TrackedEmail> {
+  return request<TrackedEmail>("/tracked-emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export function listTrackedEmails(token: string): Promise<TrackedEmail[]> {
+  return request<TrackedEmail[]>("/tracked-emails", {
     headers: {
       Authorization: `Bearer ${token}`
     }

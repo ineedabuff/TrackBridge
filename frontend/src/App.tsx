@@ -1,8 +1,26 @@
-import { Activity, ArrowRight, LogOut, MailCheck, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  ArrowRight,
+  Copy,
+  LogOut,
+  MailCheck,
+  Radar,
+  Send,
+  ShieldCheck
+} from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { MetricCard } from "./components/MetricCard";
-import { AuthMode, DashboardSummary, User, authenticate, getDashboardSummary } from "./lib/api";
+import {
+  AuthMode,
+  DashboardSummary,
+  TrackedEmail,
+  User,
+  authenticate,
+  createTrackedEmail,
+  getDashboardSummary,
+  listTrackedEmails
+} from "./lib/api";
 import "./styles/app.css";
 
 const demoStats = [
@@ -20,16 +38,24 @@ function App() {
     return raw ? (JSON.parse(raw) as User) : null;
   });
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [trackedEmails, setTrackedEmails] = useState<TrackedEmail[]>([]);
+  const [generatedPixel, setGeneratedPixel] = useState<TrackedEmail | null>(null);
   const [error, setError] = useState("");
+  const [trackingError, setTrackingError] = useState("");
+  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [creatingPixel, setCreatingPixel] = useState(false);
 
   const isAuthenticated = Boolean(token && user);
   const title = useMemo(() => (mode === "register" ? "Create workspace" : "Sign in"), [mode]);
 
   useEffect(() => {
     if (!token) return;
-    getDashboardSummary(token)
-      .then(setSummary)
+    Promise.all([getDashboardSummary(token), listTrackedEmails(token)])
+      .then(([nextSummary, emails]) => {
+        setSummary(nextSummary);
+        setTrackedEmails(emails);
+      })
       .catch(() => {
         localStorage.removeItem("trackbridge_token");
         localStorage.removeItem("trackbridge_user");
@@ -37,6 +63,15 @@ function App() {
         setUser(null);
       });
   }, [token]);
+
+  async function refreshTrackingData(activeToken = token) {
+    const [nextSummary, emails] = await Promise.all([
+      getDashboardSummary(activeToken),
+      listTrackedEmails(activeToken)
+    ]);
+    setSummary(nextSummary);
+    setTrackedEmails(emails);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,12 +96,43 @@ function App() {
     }
   }
 
+  async function handleCreatePixel(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    setTrackingError("");
+    setCopied(false);
+    setCreatingPixel(true);
+
+    const form = new FormData(event.currentTarget);
+    try {
+      const trackedEmail = await createTrackedEmail(token, {
+        recipient_email: String(form.get("recipient_email")),
+        subject: String(form.get("subject"))
+      });
+      setGeneratedPixel(trackedEmail);
+      event.currentTarget.reset();
+      await refreshTrackingData();
+    } catch (createError) {
+      setTrackingError(createError instanceof Error ? createError.message : "Pixel creation failed");
+    } finally {
+      setCreatingPixel(false);
+    }
+  }
+
+  async function copyPixelHtml() {
+    if (!generatedPixel) return;
+    await navigator.clipboard.writeText(generatedPixel.pixel_html);
+    setCopied(true);
+  }
+
   function logout() {
     localStorage.removeItem("trackbridge_token");
     localStorage.removeItem("trackbridge_user");
     setToken("");
     setUser(null);
     setSummary(null);
+    setTrackedEmails([]);
+    setGeneratedPixel(null);
   }
 
   if (isAuthenticated) {
@@ -82,6 +148,7 @@ function App() {
           </div>
           <nav>
             <a className="active" href="#dashboard"><Activity size={18} /> Dashboard</a>
+            <a href="#tracking"><Radar size={18} /> Pixels</a>
             <a href="#mail"><MailCheck size={18} /> Campaigns</a>
             <a href="#security"><ShieldCheck size={18} /> Security</a>
           </nav>
@@ -90,9 +157,9 @@ function App() {
         <section className="dashboard" id="dashboard">
           <header className="dashboard-header">
             <div>
-              <span className="eyebrow">Sprint 1</span>
+              <span className="eyebrow">Sprint 2</span>
               <h1>Email tracking command center</h1>
-              <p>Infrastructure, authentication, and operational visibility are online.</p>
+              <p>Tracking pixels are live, measurable, and ready to embed in outbound mail.</p>
             </div>
             <button className="icon-button" type="button" onClick={logout} aria-label="Sign out">
               <LogOut size={18} />
@@ -106,7 +173,7 @@ function App() {
             </div>
             <div>
               <span>API</span>
-              <strong>OpenAPI ready</strong>
+              <strong>Pixel endpoint ready</strong>
             </div>
             <div>
               <span>Members</span>
@@ -124,16 +191,66 @@ function App() {
             ))}
           </section>
 
+          <section className="tracking-workbench" id="tracking">
+            <form className="tracking-form" onSubmit={handleCreatePixel}>
+              <div>
+                <span className="eyebrow">Tracking pixel</span>
+                <h2>Create a tracked email</h2>
+              </div>
+              <label>
+                Recipient email
+                <input name="recipient_email" type="email" placeholder="client@example.com" required />
+              </label>
+              <label>
+                Subject
+                <input name="subject" minLength={1} maxLength={255} placeholder="Proposal follow-up" required />
+              </label>
+              {trackingError && <p className="form-error">{trackingError}</p>}
+              <button className="primary-button" type="submit" disabled={creatingPixel}>
+                {creatingPixel ? "Creating..." : "Generate pixel"}
+                <Send size={18} />
+              </button>
+            </form>
+
+            <article className="pixel-output">
+              <div>
+                <span className="eyebrow">Embed code</span>
+                <h2>{generatedPixel ? generatedPixel.subject : "No pixel selected"}</h2>
+              </div>
+              {generatedPixel ? (
+                <>
+                  <code>{generatedPixel.pixel_html}</code>
+                  <button className="secondary-button" type="button" onClick={copyPixelHtml}>
+                    <Copy size={18} />
+                    {copied ? "Copied" : "Copy HTML"}
+                  </button>
+                </>
+              ) : (
+                <p className="muted-copy">Generate a pixel and paste the HTML into an email body.</p>
+              )}
+            </article>
+          </section>
+
           <section className="timeline-panel">
             <div>
-              <span className="eyebrow">Roadmap</span>
-              <h2>Next delivery lane</h2>
+              <span className="eyebrow">Recent tracked emails</span>
+              <h2>Open telemetry</h2>
             </div>
-            <ol>
-              <li><strong>Sprint 2</strong><span>Tracking pixel events</span></li>
-              <li><strong>Sprint 3</strong><span>Tracked click redirects</span></li>
-              <li><strong>Sprint 4</strong><span>Attachment telemetry</span></li>
-            </ol>
+            <div className="email-table">
+              {trackedEmails.length === 0 ? (
+                <p className="muted-copy">No tracked emails yet.</p>
+              ) : (
+                trackedEmails.map((email) => (
+                  <article key={email.id}>
+                    <div>
+                      <strong>{email.subject}</strong>
+                      <span>{email.recipient_email}</span>
+                    </div>
+                    <strong>{email.opens}</strong>
+                  </article>
+                ))
+              )}
+            </div>
           </section>
         </section>
       </main>

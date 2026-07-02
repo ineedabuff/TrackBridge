@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://trackbridge:trackbridge@postgres:5432/trackbridge"
     redis_url: str = "redis://redis:6379/0"
     frontend_url: AnyUrl | str = "http://localhost:5173"
+    public_base_url: AnyUrl | str | None = None
     attachment_storage_path: str = "storage/attachments"
 
 
