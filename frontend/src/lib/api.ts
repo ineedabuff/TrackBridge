@@ -60,6 +60,18 @@ export type TrackedLink = {
   created_at: string;
 };
 
+export type TrackedAttachment = {
+  id: string;
+  label: string;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  download_url: string;
+  link_html: string;
+  downloads: number;
+  created_at: string;
+};
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -67,6 +79,23 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       "Content-Type": "application/json",
       ...options.headers
     }
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Request failed" }));
+    throw new Error(error.detail ?? "Request failed");
+  }
+
+  return response.json() as Promise<T>;
+}
+
+async function multipartRequest<T>(path: string, token: string, body: FormData): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body
   });
 
   if (!response.ok) {
@@ -126,6 +155,25 @@ export function createTrackedLink(token: string, payload: TrackedLinkCreate): Pr
 
 export function listTrackedLinks(token: string): Promise<TrackedLink[]> {
   return request<TrackedLink[]>("/tracked-links", {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export function createTrackedAttachment(
+  token: string,
+  label: string,
+  file: File
+): Promise<TrackedAttachment> {
+  const body = new FormData();
+  body.append("label", label);
+  body.append("file", file);
+  return multipartRequest<TrackedAttachment>("/tracked-attachments", token, body);
+}
+
+export function listTrackedAttachments(token: string): Promise<TrackedAttachment[]> {
+  return request<TrackedAttachment[]>("/tracked-attachments", {
     headers: {
       Authorization: `Bearer ${token}`
     }

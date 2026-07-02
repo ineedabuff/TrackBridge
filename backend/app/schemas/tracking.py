@@ -59,3 +59,29 @@ class ClickEventRead(BaseModel):
 
 class TrackedLinkDetail(TrackedLinkRead):
     click_events: list[ClickEventRead]
+
+
+class TrackedAttachmentRead(BaseModel):
+    id: str
+    label: str
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    download_url: str
+    link_html: str
+    downloads: int
+    created_at: datetime
+
+
+class DownloadEventRead(BaseModel):
+    id: str
+    ip_address: str | None
+    user_agent: str | None
+    referer: str | None
+    downloaded_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TrackedAttachmentDetail(TrackedAttachmentRead):
+    download_events: list[DownloadEventRead]

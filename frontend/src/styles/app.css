@@ -542,3 +542,19 @@ input:focus {
     grid-template-columns: 1fr;
   }
 }
+
+input[type="file"] {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.data-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1200px) {
+  .data-grid {
+    grid-template-columns: 1fr;
+  }
+}

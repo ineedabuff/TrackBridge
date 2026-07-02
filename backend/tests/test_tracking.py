@@ -71,3 +71,34 @@ def test_create_tracked_link_and_record_click() -> None:
         list_response = client.get("/api/v1/tracked-links", headers=headers)
         assert list_response.status_code == 200
         assert list_response.json()[0]["clicks"] == 1
+
+
+def test_upload_tracked_attachment_and_record_download() -> None:
+    with TestClient(app) as client:
+        token = register_user(client, email="attachments@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        create_response = client.post(
+            "/api/v1/tracked-attachments",
+            headers=headers,
+            data={"label": "Download proposal"},
+            files={"file": ("proposal.txt", b"hello from trackbridge", "text/plain")},
+        )
+        assert create_response.status_code == 201
+        attachment = create_response.json()
+        assert attachment["downloads"] == 0
+        assert attachment["original_filename"] == "proposal.txt"
+        assert attachment["link_html"].startswith("<a href=")
+
+        download_response = client.get(attachment["download_url"])
+        assert download_response.status_code == 200
+        assert download_response.content == b"hello from trackbridge"
+        assert download_response.headers["content-type"].startswith("text/plain")
+
+        summary_response = client.get("/api/v1/dashboard/summary", headers=headers)
+        assert summary_response.status_code == 200
+        assert summary_response.json()["attachments"] == 1
+
+        list_response = client.get("/api/v1/tracked-attachments", headers=headers)
+        assert list_response.status_code == 200
+        assert list_response.json()[0]["downloads"] == 1

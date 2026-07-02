@@ -6,9 +6,11 @@ import {
   LogOut,
   MailCheck,
   MousePointerClick,
+  Paperclip,
   Radar,
   Send,
-  ShieldCheck
+  ShieldCheck,
+  Upload
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -16,13 +18,16 @@ import { MetricCard } from "./components/MetricCard";
 import {
   AuthMode,
   DashboardSummary,
+  TrackedAttachment,
   TrackedEmail,
   TrackedLink,
   User,
   authenticate,
+  createTrackedAttachment,
   createTrackedEmail,
   createTrackedLink,
   getDashboardSummary,
+  listTrackedAttachments,
   listTrackedEmails,
   listTrackedLinks
 } from "./lib/api";
@@ -32,7 +37,7 @@ const demoStats = [
   { label: "Tracked emails", key: "tracked_emails" },
   { label: "Opens", key: "opens" },
   { label: "Clicks", key: "clicks" },
-  { label: "Attachments", key: "attachments" }
+  { label: "Downloads", key: "attachments" }
 ] as const;
 
 function App() {
@@ -45,29 +50,36 @@ function App() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [trackedEmails, setTrackedEmails] = useState<TrackedEmail[]>([]);
   const [trackedLinks, setTrackedLinks] = useState<TrackedLink[]>([]);
+  const [trackedAttachments, setTrackedAttachments] = useState<TrackedAttachment[]>([]);
   const [generatedPixel, setGeneratedPixel] = useState<TrackedEmail | null>(null);
   const [generatedLink, setGeneratedLink] = useState<TrackedLink | null>(null);
+  const [generatedAttachment, setGeneratedAttachment] = useState<TrackedAttachment | null>(null);
   const [error, setError] = useState("");
   const [trackingError, setTrackingError] = useState("");
   const [linkError, setLinkError] = useState("");
+  const [attachmentError, setAttachmentError] = useState("");
   const [copiedPixel, setCopiedPixel] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedAttachment, setCopiedAttachment] = useState(false);
   const [loading, setLoading] = useState(false);
   const [creatingPixel, setCreatingPixel] = useState(false);
   const [creatingLink, setCreatingLink] = useState(false);
+  const [creatingAttachment, setCreatingAttachment] = useState(false);
 
   const isAuthenticated = Boolean(token && user);
   const title = useMemo(() => (mode === "register" ? "Create workspace" : "Sign in"), [mode]);
 
   const refreshTrackingData = useCallback(async (activeToken = token) => {
-    const [nextSummary, emails, links] = await Promise.all([
+    const [nextSummary, emails, links, attachments] = await Promise.all([
       getDashboardSummary(activeToken),
       listTrackedEmails(activeToken),
-      listTrackedLinks(activeToken)
+      listTrackedLinks(activeToken),
+      listTrackedAttachments(activeToken)
     ]);
     setSummary(nextSummary);
     setTrackedEmails(emails);
     setTrackedLinks(links);
+    setTrackedAttachments(attachments);
   }, [token]);
 
   useEffect(() => {
@@ -151,6 +163,35 @@ function App() {
     }
   }
 
+  async function handleCreateAttachment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    setAttachmentError("");
+    setCopiedAttachment(false);
+    setCreatingAttachment(true);
+
+    const form = new FormData(event.currentTarget);
+    const file = form.get("file");
+    if (!(file instanceof File) || file.size === 0) {
+      setAttachmentError("Choose a file to track");
+      setCreatingAttachment(false);
+      return;
+    }
+
+    try {
+      const attachment = await createTrackedAttachment(token, String(form.get("label")), file);
+      setGeneratedAttachment(attachment);
+      event.currentTarget.reset();
+      await refreshTrackingData();
+    } catch (createError) {
+      setAttachmentError(
+        createError instanceof Error ? createError.message : "Attachment upload failed"
+      );
+    } finally {
+      setCreatingAttachment(false);
+    }
+  }
+
   async function copyPixelHtml() {
     if (!generatedPixel) return;
     await navigator.clipboard.writeText(generatedPixel.pixel_html);
@@ -163,6 +204,18 @@ function App() {
     setCopiedLink(true);
   }
 
+  async function copyAttachmentLink() {
+    if (!generatedAttachment) return;
+    await navigator.clipboard.writeText(generatedAttachment.download_url);
+    setCopiedAttachment(true);
+  }
+
+  function formatBytes(value: number) {
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+    return `${(value / 1024 / 1024).toFixed(1)} MB`;
+  }
+
   function logout() {
     localStorage.removeItem("trackbridge_token");
     localStorage.removeItem("trackbridge_user");
@@ -171,8 +224,10 @@ function App() {
     setSummary(null);
     setTrackedEmails([]);
     setTrackedLinks([]);
+    setTrackedAttachments([]);
     setGeneratedPixel(null);
     setGeneratedLink(null);
+    setGeneratedAttachment(null);
   }
 
   if (isAuthenticated) {
@@ -190,6 +245,7 @@ function App() {
             <a className="active" href="#dashboard"><Activity size={18} /> Dashboard</a>
             <a href="#tracking"><Radar size={18} /> Pixels</a>
             <a href="#clicks"><MousePointerClick size={18} /> Clicks</a>
+            <a href="#attachments"><Paperclip size={18} /> Attachments</a>
             <a href="#mail"><MailCheck size={18} /> Campaigns</a>
             <a href="#security"><ShieldCheck size={18} /> Security</a>
           </nav>
@@ -198,9 +254,9 @@ function App() {
         <section className="dashboard" id="dashboard">
           <header className="dashboard-header">
             <div>
-              <span className="eyebrow">Sprint 3</span>
+              <span className="eyebrow">Sprint 4</span>
               <h1>Email tracking command center</h1>
-              <p>Tracking pixels and click redirects are live across your self-hosted domain.</p>
+              <p>Pixels, click redirects, and tracked attachment downloads are live.</p>
             </div>
             <button className="icon-button" type="button" onClick={logout} aria-label="Sign out">
               <LogOut size={18} />
@@ -214,7 +270,7 @@ function App() {
             </div>
             <div>
               <span>API</span>
-              <strong>Pixel and click endpoints ready</strong>
+              <strong>Tracking endpoints ready</strong>
             </div>
             <div>
               <span>Members</span>
@@ -312,6 +368,46 @@ function App() {
             </article>
           </section>
 
+          <section className="tracking-workbench" id="attachments">
+            <form className="tracking-form" onSubmit={handleCreateAttachment}>
+              <div>
+                <span className="eyebrow">Tracked attachment</span>
+                <h2>Upload a tracked file</h2>
+              </div>
+              <label>
+                Link label
+                <input name="label" minLength={1} maxLength={120} placeholder="Download proposal" required />
+              </label>
+              <label>
+                File
+                <input name="file" type="file" required />
+              </label>
+              {attachmentError && <p className="form-error">{attachmentError}</p>}
+              <button className="primary-button" type="submit" disabled={creatingAttachment}>
+                {creatingAttachment ? "Uploading..." : "Upload attachment"}
+                <Upload size={18} />
+              </button>
+            </form>
+
+            <article className="pixel-output">
+              <div>
+                <span className="eyebrow">Download URL</span>
+                <h2>{generatedAttachment ? generatedAttachment.label : "No attachment selected"}</h2>
+              </div>
+              {generatedAttachment ? (
+                <>
+                  <code>{generatedAttachment.download_url}</code>
+                  <button className="secondary-button" type="button" onClick={copyAttachmentLink}>
+                    <Copy size={18} />
+                    {copiedAttachment ? "Copied" : "Copy URL"}
+                  </button>
+                </>
+              ) : (
+                <p className="muted-copy">Upload a file and share the tracked download URL.</p>
+              )}
+            </article>
+          </section>
+
           <section className="data-grid">
             <article className="timeline-panel">
               <div>
@@ -351,6 +447,28 @@ function App() {
                         <span>{link.destination_url}</span>
                       </div>
                       <strong>{link.clicks}</strong>
+                    </article>
+                  ))
+                )}
+              </div>
+            </article>
+
+            <article className="timeline-panel">
+              <div>
+                <span className="eyebrow">Recent attachments</span>
+                <h2>Download telemetry</h2>
+              </div>
+              <div className="email-table">
+                {trackedAttachments.length === 0 ? (
+                  <p className="muted-copy">No tracked attachments yet.</p>
+                ) : (
+                  trackedAttachments.map((attachment) => (
+                    <article key={attachment.id}>
+                      <div>
+                        <strong>{attachment.label}</strong>
+                        <span>{attachment.original_filename} · {formatBytes(attachment.size_bytes)}</span>
+                      </div>
+                      <strong>{attachment.downloads}</strong>
                     </article>
                   ))
                 )}
@@ -409,5 +527,3 @@ function App() {
 }
 
 export default App;
-
-

@@ -1,16 +1,28 @@
+from pathlib import Path
 from secrets import token_urlsafe
+from shutil import copyfileobj
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.models.tracking import EmailOpenEvent, LinkClickEvent, TrackedEmail, TrackedLink
+from app.models.tracking import (
+    AttachmentDownloadEvent,
+    EmailOpenEvent,
+    LinkClickEvent,
+    TrackedAttachment,
+    TrackedEmail,
+    TrackedLink,
+)
 from app.models.user import User
 from app.schemas.tracking import (
+    TrackedAttachmentDetail,
+    TrackedAttachmentRead,
     TrackedEmailCreate,
     TrackedEmailDetail,
     TrackedEmailRead,
@@ -21,6 +33,7 @@ from app.schemas.tracking import (
 
 email_router = APIRouter(prefix="/tracked-emails", tags=["tracking"])
 link_router = APIRouter(prefix="/tracked-links", tags=["tracking"])
+attachment_router = APIRouter(prefix="/tracked-attachments", tags=["tracking"])
 public_router = APIRouter(tags=["tracking"])
 TRANSPARENT_GIF = bytes.fromhex(
     "47494638396101000100800000ffffff00000021f90401000000002c00000000010001000002024401003b"
@@ -45,6 +58,12 @@ def request_ip(request: Request) -> str | None:
     if request.client is not None:
         return request.client.host
     return None
+
+
+def attachment_storage_dir() -> Path:
+    storage_dir = Path(get_settings().attachment_storage_path)
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    return storage_dir
 
 
 def serialize_tracked_email(
@@ -74,6 +93,23 @@ def serialize_tracked_link(
         link_html=f'<a href="{tracking_link_url}">{tracked_link.label}</a>',
         clicks=clicks,
         created_at=tracked_link.created_at,
+    )
+
+
+def serialize_tracked_attachment(
+    attachment: TrackedAttachment, request: Request, downloads: int = 0
+) -> TrackedAttachmentRead:
+    download_url = public_url(request, f"/a/{attachment.token}")
+    return TrackedAttachmentRead(
+        id=attachment.id,
+        label=attachment.label,
+        original_filename=attachment.original_filename,
+        content_type=attachment.content_type,
+        size_bytes=attachment.size_bytes,
+        download_url=download_url,
+        link_html=f'<a href="{download_url}">{attachment.label}</a>',
+        downloads=downloads,
+        created_at=attachment.created_at,
     )
 
 
@@ -203,6 +239,90 @@ def read_tracked_link(
     return TrackedLinkDetail(**base.model_dump(), click_events=list(events))
 
 
+@attachment_router.post("", response_model=TrackedAttachmentRead, status_code=status.HTTP_201_CREATED)
+def create_tracked_attachment(
+    request: Request,
+    label: str = Form(..., min_length=1, max_length=120),
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TrackedAttachmentRead:
+    original_filename = Path(file.filename or "attachment.bin").name
+    suffix = Path(original_filename).suffix
+    stored_filename = f"{uuid4()}{suffix}"
+    storage_path = attachment_storage_dir() / stored_filename
+
+    with storage_path.open("wb") as output:
+        copyfileobj(file.file, output)
+
+    size_bytes = storage_path.stat().st_size
+    attachment = TrackedAttachment(
+        owner_id=current_user.id,
+        label=label,
+        original_filename=original_filename,
+        stored_filename=stored_filename,
+        content_type=file.content_type or "application/octet-stream",
+        size_bytes=size_bytes,
+        token=token_urlsafe(32),
+    )
+    db.add(attachment)
+    db.commit()
+    db.refresh(attachment)
+    return serialize_tracked_attachment(attachment, request)
+
+
+@attachment_router.get("", response_model=list[TrackedAttachmentRead])
+def list_tracked_attachments(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[TrackedAttachmentRead]:
+    rows = db.execute(
+        select(TrackedAttachment, func.count(AttachmentDownloadEvent.id))
+        .outerjoin(
+            AttachmentDownloadEvent,
+            AttachmentDownloadEvent.tracked_attachment_id == TrackedAttachment.id,
+        )
+        .where(TrackedAttachment.owner_id == current_user.id)
+        .group_by(TrackedAttachment.id)
+        .order_by(TrackedAttachment.created_at.desc())
+    ).all()
+    return [
+        serialize_tracked_attachment(attachment, request, downloads)
+        for attachment, downloads in rows
+    ]
+
+
+@attachment_router.get("/{tracked_attachment_id}", response_model=TrackedAttachmentDetail)
+def read_tracked_attachment(
+    tracked_attachment_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TrackedAttachmentDetail:
+    attachment = db.scalar(
+        select(TrackedAttachment).where(
+            TrackedAttachment.id == tracked_attachment_id,
+            TrackedAttachment.owner_id == current_user.id,
+        )
+    )
+    if attachment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tracked attachment not found")
+
+    downloads = db.scalar(
+        select(func.count(AttachmentDownloadEvent.id)).where(
+            AttachmentDownloadEvent.tracked_attachment_id == attachment.id
+        )
+    ) or 0
+    base = serialize_tracked_attachment(attachment, request, downloads)
+    events = db.scalars(
+        select(AttachmentDownloadEvent)
+        .where(AttachmentDownloadEvent.tracked_attachment_id == attachment.id)
+        .order_by(AttachmentDownloadEvent.downloaded_at.desc())
+    ).all()
+    return TrackedAttachmentDetail(**base.model_dump(), download_events=list(events))
+
+
 @public_router.get("/t/{token}.gif", include_in_schema=False)
 def track_open(token: str, request: Request, db: Session = Depends(get_db)) -> Response:
     tracked_email = db.scalar(select(TrackedEmail).where(TrackedEmail.token == token))
@@ -244,3 +364,32 @@ def track_click(token: str, request: Request, db: Session = Depends(get_db)) -> 
     )
     db.commit()
     return RedirectResponse(url=tracked_link.destination_url, status_code=status.HTTP_302_FOUND)
+
+
+@public_router.get("/a/{token}", include_in_schema=False)
+def track_attachment_download(
+    token: str, request: Request, db: Session = Depends(get_db)
+) -> FileResponse:
+    attachment = db.scalar(select(TrackedAttachment).where(TrackedAttachment.token == token))
+    if attachment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tracked attachment not found")
+
+    storage_path = attachment_storage_dir() / attachment.stored_filename
+    if not storage_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment file not found")
+
+    db.add(
+        AttachmentDownloadEvent(
+            tracked_attachment_id=attachment.id,
+            ip_address=request_ip(request),
+            user_agent=request.headers.get("user-agent"),
+            referer=request.headers.get("referer"),
+        )
+    )
+    db.commit()
+    return FileResponse(
+        path=storage_path,
+        media_type=attachment.content_type,
+        filename=attachment.original_filename,
+        headers={"Cache-Control": "private, no-store, max-age=0"},
+    )

@@ -32,6 +32,15 @@ TrackBridge is a self-hosted email tracking platform inspired by mxHERO TotalTra
 - Dashboard click counters backed by real tracking data
 - Recent tracked links list with click counts
 
+## Sprint 4 scope
+
+- Local tracked attachment storage
+- Public tracked attachment download endpoint at `/a/{token}`
+- Download event capture with IP address, user-agent, referer, and timestamp
+- Authenticated API to upload files and generate tracked download URLs
+- Dashboard download counters backed by real tracking data
+- Recent tracked attachments list with download counts
+
 ## Quick start
 
 1. Copy the environment file.
@@ -79,6 +88,14 @@ docker compose up --build -d
 4. Copy the generated redirect URL into an email link.
 5. When someone clicks it, TrackBridge records the click and redirects to the destination.
 
+## Attachment tracking flow
+
+1. Sign in.
+2. Open the Attachments section in the dashboard.
+3. Upload a file with a link label.
+4. Copy the generated download URL into an email link.
+5. When someone downloads it, TrackBridge records the event and serves the file.
+
 ## Local backend development
 
 ```bash
@@ -100,3 +117,5 @@ pnpm dev
 ## Production notes
 
 Change `TRACKBRIDGE_SECRET_KEY`, database credentials, `TRACKBRIDGE_DOMAIN`, `TRACKBRIDGE_ACME_EMAIL`, and `TRACKBRIDGE_PUBLIC_BASE_URL` before deployment. Caddy will manage HTTPS automatically when the domain points to the server and ports 80/443 are reachable.
+
+Tracked files are stored locally under `storage/attachments` by default. This path is mounted into the backend container and can later be replaced by an S3-compatible backend.
