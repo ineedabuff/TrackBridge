@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TrackBridge</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <span>TB</span>
+        <div>
+          <strong>TrackBridge</strong>
+          <small>Gmail extension</small>
+        </div>
+      </header>
+
+      <form id="settings-form">
+        <label>
+          TrackBridge URL
+          <input id="api-base-url" name="apiBaseUrl" type="url" placeholder="https://trackbridge.maranda.io" required />
+        </label>
+        <label>
+          Email
+          <input id="email" name="email" type="email" placeholder="you@example.com" autocomplete="username" required />
+        </label>
+        <label>
+          Password
+          <input id="password" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit">Connect</button>
+      </form>
+
+      <section class="actions">
+        <button id="open-dashboard" type="button">Open dashboard</button>
+        <button id="clear-session" type="button">Disconnect</button>
+      </section>
+
+      <p id="status">Not connected</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

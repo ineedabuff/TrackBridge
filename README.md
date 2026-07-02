@@ -41,6 +41,15 @@ TrackBridge is a self-hosted email tracking platform inspired by mxHERO TotalTra
 - Dashboard download counters backed by real tracking data
 - Recent tracked attachments list with download counts
 
+## Sprint 5 scope
+
+- Chrome extension using Manifest V3
+- Popup login/configuration for self-hosted TrackBridge
+- Gmail content script with a floating TrackBridge panel
+- Insert tracking pixels into Gmail compose windows
+- Generate and insert tracked links into Gmail compose windows
+- Quick dashboard access from Gmail and the extension popup
+
 ## Quick start
 
 1. Copy the environment file.
@@ -96,6 +105,15 @@ docker compose up --build -d
 4. Copy the generated download URL into an email link.
 5. When someone downloads it, TrackBridge records the event and serves the file.
 
+## Chrome extension development
+
+1. Open `chrome://extensions`.
+2. Enable Developer mode.
+3. Click Load unpacked.
+4. Select the `extension` folder.
+5. Open the extension popup and sign in with your TrackBridge URL.
+6. Open Gmail and use the TrackBridge panel in the bottom-right corner.
+
 ## Local backend development
 
 ```bash
@@ -119,3 +137,4 @@ pnpm dev
 Change `TRACKBRIDGE_SECRET_KEY`, database credentials, `TRACKBRIDGE_DOMAIN`, `TRACKBRIDGE_ACME_EMAIL`, and `TRACKBRIDGE_PUBLIC_BASE_URL` before deployment. Caddy will manage HTTPS automatically when the domain points to the server and ports 80/443 are reachable.
 
 Tracked files are stored locally under `storage/attachments` by default. This path is mounted into the backend container and can later be replaced by an S3-compatible backend.
+

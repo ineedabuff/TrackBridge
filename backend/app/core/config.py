@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://redis:6379/0"
     frontend_url: AnyUrl | str = "http://localhost:5173"
     public_base_url: AnyUrl | str | None = None
+    extension_origin_regex: str = r"chrome-extension://.*"
     attachment_storage_path: str = "storage/attachments"
 
 

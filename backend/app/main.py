@@ -21,7 +21,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="TrackBridge API",
-    version="0.4.0",
+    version="0.5.0",
     description="Self-hosted email tracking API.",
     openapi_url="/openapi.json",
     docs_url="/docs",
@@ -31,6 +31,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[str(settings.frontend_url), "http://localhost", "http://localhost:5173"],
+    allow_origin_regex=settings.extension_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

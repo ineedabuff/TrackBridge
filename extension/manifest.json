@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "TrackBridge for Gmail",
+  "description": "Insert TrackBridge pixels and tracked links inside Gmail compose windows.",
+  "version": "0.5.0",
+  "action": {
+    "default_title": "TrackBridge",
+    "default_popup": "src/popup.html"
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://*/",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["src/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
