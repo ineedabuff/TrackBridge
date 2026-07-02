@@ -1,0 +1,31 @@
+[project]
+name = "trackbridge-backend"
+version = "0.1.0"
+description = "FastAPI backend for TrackBridge."
+requires-python = ">=3.12"
+dependencies = [
+  "bcrypt>=4.1.2",
+  "email-validator>=2.1.1",
+  "fastapi>=0.115.0",
+  "psycopg[binary]>=3.2.1",
+  "pydantic-settings>=2.4.0",
+  "pyjwt>=2.9.0",
+  "python-multipart>=0.0.9",
+  "redis>=5.0.8",
+  "sqlalchemy>=2.0.32",
+  "uvicorn[standard]>=0.30.6"
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.27.2",
+  "pytest>=8.3.2",
+  "ruff>=0.6.4"
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
