@@ -23,6 +23,15 @@ TrackBridge is a self-hosted email tracking platform inspired by mxHERO TotalTra
 - Dashboard counters backed by real tracking data
 - Recent tracked emails list with open counts
 
+## Sprint 3 scope
+
+- Tracked link records
+- Public click redirect endpoint at `/c/{token}`
+- Click event capture with IP address, user-agent, referer, and timestamp
+- Authenticated API to generate redirect URLs and link HTML
+- Dashboard click counters backed by real tracking data
+- Recent tracked links list with click counts
+
 ## Quick start
 
 1. Copy the environment file.
@@ -61,6 +70,14 @@ docker compose up --build -d
 3. Enter a recipient and subject.
 4. Copy the generated HTML image tag into an email body.
 5. When the email client loads the image, TrackBridge records an open event.
+
+## Click tracking flow
+
+1. Sign in.
+2. Open the Clicks section in the dashboard.
+3. Enter a label and destination URL.
+4. Copy the generated redirect URL into an email link.
+5. When someone clicks it, TrackBridge records the click and redirects to the destination.
 
 ## Local backend development
 

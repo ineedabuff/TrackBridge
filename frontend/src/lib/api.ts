@@ -45,6 +45,21 @@ export type TrackedEmail = {
   created_at: string;
 };
 
+export type TrackedLinkCreate = {
+  label: string;
+  destination_url: string;
+};
+
+export type TrackedLink = {
+  id: string;
+  label: string;
+  destination_url: string;
+  tracking_url: string;
+  link_html: string;
+  clicks: number;
+  created_at: string;
+};
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -93,6 +108,24 @@ export function createTrackedEmail(
 
 export function listTrackedEmails(token: string): Promise<TrackedEmail[]> {
   return request<TrackedEmail[]>("/tracked-emails", {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export function createTrackedLink(token: string, payload: TrackedLinkCreate): Promise<TrackedLink> {
+  return request<TrackedLink>("/tracked-links", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export function listTrackedLinks(token: string): Promise<TrackedLink[]> {
+  return request<TrackedLink[]>("/tracked-links", {
     headers: {
       Authorization: `Bearer ${token}`
     }

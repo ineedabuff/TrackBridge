@@ -21,7 +21,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(
     title="TrackBridge API",
-    version="0.2.0",
+    version="0.3.0",
     description="Self-hosted email tracking API.",
     openapi_url="/openapi.json",
     docs_url="/docs",
@@ -39,5 +39,6 @@ app.add_middleware(
 app.include_router(health.router, prefix=settings.api_v1_prefix)
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
 app.include_router(dashboard.router, prefix=settings.api_v1_prefix)
-app.include_router(tracking.api_router, prefix=settings.api_v1_prefix)
+app.include_router(tracking.email_router, prefix=settings.api_v1_prefix)
+app.include_router(tracking.link_router, prefix=settings.api_v1_prefix)
 app.include_router(tracking.public_router)

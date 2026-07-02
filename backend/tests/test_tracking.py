@@ -43,3 +43,31 @@ def test_create_tracking_pixel_and_record_open() -> None:
         list_response = client.get("/api/v1/tracked-emails", headers=headers)
         assert list_response.status_code == 200
         assert list_response.json()[0]["opens"] == 1
+
+
+def test_create_tracked_link_and_record_click() -> None:
+    with TestClient(app) as client:
+        token = register_user(client, email="clicks@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        create_response = client.post(
+            "/api/v1/tracked-links",
+            headers=headers,
+            json={"label": "View proposal", "destination_url": "https://example.com/proposal"},
+        )
+        assert create_response.status_code == 201
+        tracked_link = create_response.json()
+        assert tracked_link["clicks"] == 0
+        assert tracked_link["link_html"].startswith("<a href=")
+
+        click_response = client.get(tracked_link["tracking_url"], follow_redirects=False)
+        assert click_response.status_code == 302
+        assert click_response.headers["location"] == "https://example.com/proposal"
+
+        summary_response = client.get("/api/v1/dashboard/summary", headers=headers)
+        assert summary_response.status_code == 200
+        assert summary_response.json()["clicks"] == 1
+
+        list_response = client.get("/api/v1/tracked-links", headers=headers)
+        assert list_response.status_code == 200
+        assert list_response.json()[0]["clicks"] == 1

@@ -2,24 +2,29 @@ import {
   Activity,
   ArrowRight,
   Copy,
+  Link2,
   LogOut,
   MailCheck,
+  MousePointerClick,
   Radar,
   Send,
   ShieldCheck
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { MetricCard } from "./components/MetricCard";
 import {
   AuthMode,
   DashboardSummary,
   TrackedEmail,
+  TrackedLink,
   User,
   authenticate,
   createTrackedEmail,
+  createTrackedLink,
   getDashboardSummary,
-  listTrackedEmails
+  listTrackedEmails,
+  listTrackedLinks
 } from "./lib/api";
 import "./styles/app.css";
 
@@ -39,39 +44,43 @@ function App() {
   });
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [trackedEmails, setTrackedEmails] = useState<TrackedEmail[]>([]);
+  const [trackedLinks, setTrackedLinks] = useState<TrackedLink[]>([]);
   const [generatedPixel, setGeneratedPixel] = useState<TrackedEmail | null>(null);
+  const [generatedLink, setGeneratedLink] = useState<TrackedLink | null>(null);
   const [error, setError] = useState("");
   const [trackingError, setTrackingError] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [copiedPixel, setCopiedPixel] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [loading, setLoading] = useState(false);
   const [creatingPixel, setCreatingPixel] = useState(false);
+  const [creatingLink, setCreatingLink] = useState(false);
 
   const isAuthenticated = Boolean(token && user);
   const title = useMemo(() => (mode === "register" ? "Create workspace" : "Sign in"), [mode]);
 
-  useEffect(() => {
-    if (!token) return;
-    Promise.all([getDashboardSummary(token), listTrackedEmails(token)])
-      .then(([nextSummary, emails]) => {
-        setSummary(nextSummary);
-        setTrackedEmails(emails);
-      })
-      .catch(() => {
-        localStorage.removeItem("trackbridge_token");
-        localStorage.removeItem("trackbridge_user");
-        setToken("");
-        setUser(null);
-      });
-  }, [token]);
-
-  async function refreshTrackingData(activeToken = token) {
-    const [nextSummary, emails] = await Promise.all([
+  const refreshTrackingData = useCallback(async (activeToken = token) => {
+    const [nextSummary, emails, links] = await Promise.all([
       getDashboardSummary(activeToken),
-      listTrackedEmails(activeToken)
+      listTrackedEmails(activeToken),
+      listTrackedLinks(activeToken)
     ]);
     setSummary(nextSummary);
     setTrackedEmails(emails);
-  }
+    setTrackedLinks(links);
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    // Loading authenticated dashboard data is the intended synchronization here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    refreshTrackingData(token).catch(() => {
+      localStorage.removeItem("trackbridge_token");
+      localStorage.removeItem("trackbridge_user");
+      setToken("");
+      setUser(null);
+    });
+  }, [refreshTrackingData, token]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,7 +109,7 @@ function App() {
     event.preventDefault();
     if (!token) return;
     setTrackingError("");
-    setCopied(false);
+    setCopiedPixel(false);
     setCreatingPixel(true);
 
     const form = new FormData(event.currentTarget);
@@ -119,10 +128,39 @@ function App() {
     }
   }
 
+  async function handleCreateLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    setLinkError("");
+    setCopiedLink(false);
+    setCreatingLink(true);
+
+    const form = new FormData(event.currentTarget);
+    try {
+      const trackedLink = await createTrackedLink(token, {
+        label: String(form.get("label")),
+        destination_url: String(form.get("destination_url"))
+      });
+      setGeneratedLink(trackedLink);
+      event.currentTarget.reset();
+      await refreshTrackingData();
+    } catch (createError) {
+      setLinkError(createError instanceof Error ? createError.message : "Link creation failed");
+    } finally {
+      setCreatingLink(false);
+    }
+  }
+
   async function copyPixelHtml() {
     if (!generatedPixel) return;
     await navigator.clipboard.writeText(generatedPixel.pixel_html);
-    setCopied(true);
+    setCopiedPixel(true);
+  }
+
+  async function copyTrackedLink() {
+    if (!generatedLink) return;
+    await navigator.clipboard.writeText(generatedLink.tracking_url);
+    setCopiedLink(true);
   }
 
   function logout() {
@@ -132,7 +170,9 @@ function App() {
     setUser(null);
     setSummary(null);
     setTrackedEmails([]);
+    setTrackedLinks([]);
     setGeneratedPixel(null);
+    setGeneratedLink(null);
   }
 
   if (isAuthenticated) {
@@ -149,6 +189,7 @@ function App() {
           <nav>
             <a className="active" href="#dashboard"><Activity size={18} /> Dashboard</a>
             <a href="#tracking"><Radar size={18} /> Pixels</a>
+            <a href="#clicks"><MousePointerClick size={18} /> Clicks</a>
             <a href="#mail"><MailCheck size={18} /> Campaigns</a>
             <a href="#security"><ShieldCheck size={18} /> Security</a>
           </nav>
@@ -157,9 +198,9 @@ function App() {
         <section className="dashboard" id="dashboard">
           <header className="dashboard-header">
             <div>
-              <span className="eyebrow">Sprint 2</span>
+              <span className="eyebrow">Sprint 3</span>
               <h1>Email tracking command center</h1>
-              <p>Tracking pixels are live, measurable, and ready to embed in outbound mail.</p>
+              <p>Tracking pixels and click redirects are live across your self-hosted domain.</p>
             </div>
             <button className="icon-button" type="button" onClick={logout} aria-label="Sign out">
               <LogOut size={18} />
@@ -173,7 +214,7 @@ function App() {
             </div>
             <div>
               <span>API</span>
-              <strong>Pixel endpoint ready</strong>
+              <strong>Pixel and click endpoints ready</strong>
             </div>
             <div>
               <span>Members</span>
@@ -222,7 +263,7 @@ function App() {
                   <code>{generatedPixel.pixel_html}</code>
                   <button className="secondary-button" type="button" onClick={copyPixelHtml}>
                     <Copy size={18} />
-                    {copied ? "Copied" : "Copy HTML"}
+                    {copiedPixel ? "Copied" : "Copy HTML"}
                   </button>
                 </>
               ) : (
@@ -231,26 +272,90 @@ function App() {
             </article>
           </section>
 
-          <section className="timeline-panel">
-            <div>
-              <span className="eyebrow">Recent tracked emails</span>
-              <h2>Open telemetry</h2>
-            </div>
-            <div className="email-table">
-              {trackedEmails.length === 0 ? (
-                <p className="muted-copy">No tracked emails yet.</p>
+          <section className="tracking-workbench" id="clicks">
+            <form className="tracking-form" onSubmit={handleCreateLink}>
+              <div>
+                <span className="eyebrow">Click tracking</span>
+                <h2>Create a tracked link</h2>
+              </div>
+              <label>
+                Link label
+                <input name="label" minLength={1} maxLength={120} placeholder="View proposal" required />
+              </label>
+              <label>
+                Destination URL
+                <input name="destination_url" type="url" placeholder="https://example.com/proposal" required />
+              </label>
+              {linkError && <p className="form-error">{linkError}</p>}
+              <button className="primary-button" type="submit" disabled={creatingLink}>
+                {creatingLink ? "Creating..." : "Generate link"}
+                <Link2 size={18} />
+              </button>
+            </form>
+
+            <article className="pixel-output">
+              <div>
+                <span className="eyebrow">Redirect URL</span>
+                <h2>{generatedLink ? generatedLink.label : "No link selected"}</h2>
+              </div>
+              {generatedLink ? (
+                <>
+                  <code>{generatedLink.tracking_url}</code>
+                  <button className="secondary-button" type="button" onClick={copyTrackedLink}>
+                    <Copy size={18} />
+                    {copiedLink ? "Copied" : "Copy URL"}
+                  </button>
+                </>
               ) : (
-                trackedEmails.map((email) => (
-                  <article key={email.id}>
-                    <div>
-                      <strong>{email.subject}</strong>
-                      <span>{email.recipient_email}</span>
-                    </div>
-                    <strong>{email.opens}</strong>
-                  </article>
-                ))
+                <p className="muted-copy">Generate a redirect URL and use it as the link in your email.</p>
               )}
-            </div>
+            </article>
+          </section>
+
+          <section className="data-grid">
+            <article className="timeline-panel">
+              <div>
+                <span className="eyebrow">Recent tracked emails</span>
+                <h2>Open telemetry</h2>
+              </div>
+              <div className="email-table">
+                {trackedEmails.length === 0 ? (
+                  <p className="muted-copy">No tracked emails yet.</p>
+                ) : (
+                  trackedEmails.map((email) => (
+                    <article key={email.id}>
+                      <div>
+                        <strong>{email.subject}</strong>
+                        <span>{email.recipient_email}</span>
+                      </div>
+                      <strong>{email.opens}</strong>
+                    </article>
+                  ))
+                )}
+              </div>
+            </article>
+
+            <article className="timeline-panel">
+              <div>
+                <span className="eyebrow">Recent tracked links</span>
+                <h2>Click telemetry</h2>
+              </div>
+              <div className="email-table">
+                {trackedLinks.length === 0 ? (
+                  <p className="muted-copy">No tracked links yet.</p>
+                ) : (
+                  trackedLinks.map((link) => (
+                    <article key={link.id}>
+                      <div>
+                        <strong>{link.label}</strong>
+                        <span>{link.destination_url}</span>
+                      </div>
+                      <strong>{link.clicks}</strong>
+                    </article>
+                  ))
+                )}
+              </div>
+            </article>
           </section>
         </section>
       </main>
@@ -304,3 +409,5 @@ function App() {
 }
 
 export default App;
+
+
