@@ -1,6 +1,7 @@
 import {
   Activity,
   BarChart3,
+  Bell,
   ArrowRight,
   Copy,
   Link2,
@@ -20,6 +21,9 @@ import {
   AnalyticsOverview,
   AuthMode,
   DashboardSummary,
+  ReportHistoryItem,
+  ReportPreferences,
+  ReportSendResult,
   TrackedAttachment,
   TrackedEmail,
   TrackedLink,
@@ -30,9 +34,13 @@ import {
   createTrackedEmail,
   createTrackedLink,
   getDashboardSummary,
+  getReportPreferences,
+  listReportHistory,
   listTrackedAttachments,
   listTrackedEmails,
-  listTrackedLinks
+  listTrackedLinks,
+  sendReportNow,
+  updateReportPreferences
 } from "./lib/api";
 import "./styles/app.css";
 
@@ -55,6 +63,9 @@ function App() {
   const [trackedEmails, setTrackedEmails] = useState<TrackedEmail[]>([]);
   const [trackedLinks, setTrackedLinks] = useState<TrackedLink[]>([]);
   const [trackedAttachments, setTrackedAttachments] = useState<TrackedAttachment[]>([]);
+  const [reportPreferences, setReportPreferences] = useState<ReportPreferences | null>(null);
+  const [reportHistory, setReportHistory] = useState<ReportHistoryItem[]>([]);
+  const [reportResult, setReportResult] = useState<ReportSendResult | null>(null);
   const [generatedPixel, setGeneratedPixel] = useState<TrackedEmail | null>(null);
   const [generatedLink, setGeneratedLink] = useState<TrackedLink | null>(null);
   const [generatedAttachment, setGeneratedAttachment] = useState<TrackedAttachment | null>(null);
@@ -62,6 +73,7 @@ function App() {
   const [trackingError, setTrackingError] = useState("");
   const [linkError, setLinkError] = useState("");
   const [attachmentError, setAttachmentError] = useState("");
+  const [reportError, setReportError] = useState("");
   const [copiedPixel, setCopiedPixel] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedAttachment, setCopiedAttachment] = useState(false);
@@ -69,23 +81,29 @@ function App() {
   const [creatingPixel, setCreatingPixel] = useState(false);
   const [creatingLink, setCreatingLink] = useState(false);
   const [creatingAttachment, setCreatingAttachment] = useState(false);
+  const [savingReports, setSavingReports] = useState(false);
+  const [sendingReport, setSendingReport] = useState(false);
 
   const isAuthenticated = Boolean(token && user);
   const title = useMemo(() => (mode === "register" ? "Create workspace" : "Sign in"), [mode]);
 
   const refreshTrackingData = useCallback(async (activeToken = token) => {
-    const [nextSummary, nextAnalytics, emails, links, attachments] = await Promise.all([
+    const [nextSummary, nextAnalytics, emails, links, attachments, preferences, history] = await Promise.all([
       getDashboardSummary(activeToken),
       getAnalyticsOverview(activeToken),
       listTrackedEmails(activeToken),
       listTrackedLinks(activeToken),
-      listTrackedAttachments(activeToken)
+      listTrackedAttachments(activeToken),
+      getReportPreferences(activeToken),
+      listReportHistory(activeToken)
     ]);
     setSummary(nextSummary);
     setAnalytics(nextAnalytics);
     setTrackedEmails(emails);
     setTrackedLinks(links);
     setTrackedAttachments(attachments);
+    setReportPreferences(preferences);
+    setReportHistory(history);
   }, [token]);
 
   useEffect(() => {
@@ -198,6 +216,47 @@ function App() {
     }
   }
 
+
+  async function handleSaveReports(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) return;
+    setReportError("");
+    setSavingReports(true);
+
+    const form = new FormData(event.currentTarget);
+    try {
+      const preferences = await updateReportPreferences(token, {
+        recipient_email: String(form.get("recipient_email") || user?.email || ""),
+        daily_enabled: form.has("daily_enabled"),
+        weekly_enabled: form.has("weekly_enabled"),
+        immediate_open_enabled: form.has("immediate_open_enabled"),
+        immediate_click_enabled: form.has("immediate_click_enabled"),
+        immediate_download_enabled: form.has("immediate_download_enabled")
+      });
+      setReportPreferences(preferences);
+    } catch (saveError) {
+      setReportError(saveError instanceof Error ? saveError.message : "Report preferences failed");
+    } finally {
+      setSavingReports(false);
+    }
+  }
+
+  async function handleSendReportNow() {
+    if (!token) return;
+    setReportError("");
+    setSendingReport(true);
+
+    try {
+      const result = await sendReportNow(token);
+      setReportResult(result);
+      setReportHistory(await listReportHistory(token));
+    } catch (sendError) {
+      setReportError(sendError instanceof Error ? sendError.message : "Report send failed");
+    } finally {
+      setSendingReport(false);
+    }
+  }
+
   async function copyPixelHtml() {
     if (!generatedPixel) return;
     await navigator.clipboard.writeText(generatedPixel.pixel_html);
@@ -232,6 +291,9 @@ function App() {
     setTrackedEmails([]);
     setTrackedLinks([]);
     setTrackedAttachments([]);
+    setReportPreferences(null);
+    setReportHistory([]);
+    setReportResult(null);
     setGeneratedPixel(null);
     setGeneratedLink(null);
     setGeneratedAttachment(null);
@@ -254,6 +316,7 @@ function App() {
             <a href="#clicks"><MousePointerClick size={18} /> Clicks</a>
             <a href="#attachments"><Paperclip size={18} /> Attachments</a>
             <a href="#analytics"><BarChart3 size={18} /> Analytics</a>
+            <a href="#reports"><Bell size={18} /> Reports</a>
             <a href="#mail"><MailCheck size={18} /> Campaigns</a>
             <a href="#security"><ShieldCheck size={18} /> Security</a>
           </nav>
@@ -262,9 +325,9 @@ function App() {
         <section className="dashboard" id="dashboard">
           <header className="dashboard-header">
             <div>
-              <span className="eyebrow">Sprint 6</span>
+              <span className="eyebrow">Sprint 7</span>
               <h1>Email tracking command center</h1>
-              <p>Analytics, timelines, rates, and signal trends are live.</p>
+              <p>Reports, alerts, and delivery summaries are live.</p>
             </div>
             <button className="icon-button" type="button" onClick={logout} aria-label="Sign out">
               <LogOut size={18} />
@@ -360,6 +423,93 @@ function App() {
                   )}
                 </div>
               </article>
+            </div>
+          </section>
+
+
+          <section className="reports-panel" id="reports">
+            <div className="analytics-header">
+              <div>
+                <span className="eyebrow">Reports</span>
+                <h2>Email reports</h2>
+              </div>
+              <button className="secondary-button compact" type="button" onClick={handleSendReportNow} disabled={sendingReport}>
+                <Bell size={18} />
+                {sendingReport ? "Sending..." : "Send now"}
+              </button>
+            </div>
+
+            <div className="reports-grid">
+              <form className="report-form" key={reportPreferences?.updated_at ?? "reports"} onSubmit={handleSaveReports}>
+                <label>
+                  Recipient email
+                  <input
+                    name="recipient_email"
+                    type="email"
+                    defaultValue={reportPreferences?.recipient_email ?? user?.email ?? ""}
+                    required
+                  />
+                </label>
+
+                <label className="checkbox-row">
+                  <input name="daily_enabled" type="checkbox" defaultChecked={reportPreferences?.daily_enabled ?? false} />
+                  Daily digest
+                </label>
+                <label className="checkbox-row">
+                  <input name="weekly_enabled" type="checkbox" defaultChecked={reportPreferences?.weekly_enabled ?? false} />
+                  Weekly digest
+                </label>
+                <label className="checkbox-row">
+                  <input name="immediate_open_enabled" type="checkbox" defaultChecked={reportPreferences?.immediate_open_enabled ?? false} />
+                  Open alerts
+                </label>
+                <label className="checkbox-row">
+                  <input name="immediate_click_enabled" type="checkbox" defaultChecked={reportPreferences?.immediate_click_enabled ?? false} />
+                  Click alerts
+                </label>
+                <label className="checkbox-row">
+                  <input name="immediate_download_enabled" type="checkbox" defaultChecked={reportPreferences?.immediate_download_enabled ?? false} />
+                  Download alerts
+                </label>
+
+                {reportError && <p className="form-error">{reportError}</p>}
+                <button className="primary-button" type="submit" disabled={savingReports}>
+                  {savingReports ? "Saving..." : "Save reports"}
+                  <ArrowRight size={18} />
+                </button>
+              </form>
+
+              <article className="report-preview">
+                <div>
+                  <span className="eyebrow">Latest report</span>
+                  <h3>{reportResult?.subject ?? "No report sent yet"}</h3>
+                </div>
+                {reportResult ? (
+                  <>
+                    <p className={reportResult.sent ? "status-good" : "status-muted"}>{reportResult.message}</p>
+                    <pre>{reportResult.preview_text}</pre>
+                  </>
+                ) : (
+                  <p className="muted-copy">Report previews will appear here after a manual send.</p>
+                )}
+              </article>
+            </div>
+
+            <div className="report-history">
+              <h3>Report history</h3>
+              <div className="activity-list">
+                {reportHistory.length === 0 ? (
+                  <p className="muted-copy">No sent reports yet.</p>
+                ) : (
+                  reportHistory.map((item) => (
+                    <div key={item.id}>
+                      <span>{item.status}</span>
+                      <strong>{item.subject}</strong>
+                      <small>{item.recipient_email}</small>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </section>
           <section className="tracking-workbench" id="tracking">

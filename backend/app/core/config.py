@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     public_base_url: AnyUrl | str | None = None
     extension_origin_regex: str = r"chrome-extension://.*"
     attachment_storage_path: str = "storage/attachments"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
 
 
 @lru_cache

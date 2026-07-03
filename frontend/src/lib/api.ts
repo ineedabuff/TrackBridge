@@ -108,6 +108,44 @@ export type TrackedAttachment = {
   created_at: string;
 };
 
+export type ReportPreferences = {
+  id: string;
+  recipient_email: string;
+  daily_enabled: boolean;
+  weekly_enabled: boolean;
+  immediate_open_enabled: boolean;
+  immediate_click_enabled: boolean;
+  immediate_download_enabled: boolean;
+  updated_at: string;
+};
+
+export type ReportPreferencesUpdate = {
+  recipient_email: string;
+  daily_enabled: boolean;
+  weekly_enabled: boolean;
+  immediate_open_enabled: boolean;
+  immediate_click_enabled: boolean;
+  immediate_download_enabled: boolean;
+};
+
+export type ReportHistoryItem = {
+  id: string;
+  report_type: string;
+  recipient_email: string;
+  subject: string;
+  status: string;
+  message: string | null;
+  sent_at: string;
+};
+
+export type ReportSendResult = {
+  sent: boolean;
+  message: string;
+  subject: string;
+  preview_text: string;
+  preview_html: string;
+};
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -218,6 +256,45 @@ export function createTrackedAttachment(
 
 export function listTrackedAttachments(token: string): Promise<TrackedAttachment[]> {
   return request<TrackedAttachment[]>("/tracked-attachments", {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+
+export function getReportPreferences(token: string): Promise<ReportPreferences> {
+  return request<ReportPreferences>("/reports/preferences", {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export function updateReportPreferences(
+  token: string,
+  payload: ReportPreferencesUpdate
+): Promise<ReportPreferences> {
+  return request<ReportPreferences>("/reports/preferences", {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export function sendReportNow(token: string): Promise<ReportSendResult> {
+  return request<ReportSendResult>("/reports/send-now", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export function listReportHistory(token: string): Promise<ReportHistoryItem[]> {
+  return request<ReportHistoryItem[]>("/reports/history", {
     headers: {
       Authorization: `Bearer ${token}`
     }
