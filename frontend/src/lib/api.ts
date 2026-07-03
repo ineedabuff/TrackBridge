@@ -57,6 +57,7 @@ export type AnalyticsOverview = {
     target: string;
     occurred_at: string;
     ip_address: string | null;
+    user_agent: string | null;
   }>;
   top_items: Array<{
     item_type: string;

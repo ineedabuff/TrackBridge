@@ -97,6 +97,7 @@ def analytics_overview(
                 target=email.recipient_email,
                 occurred_at=event.opened_at,
                 ip_address=event.ip_address,
+                user_agent=event.user_agent,
             )
         )
         top_counts[("email", email.subject, email.recipient_email)] += 1
@@ -112,6 +113,7 @@ def analytics_overview(
                 target=link.destination_url,
                 occurred_at=event.clicked_at,
                 ip_address=event.ip_address,
+                user_agent=event.user_agent,
             )
         )
         top_counts[("link", link.label, link.destination_url)] += 1
@@ -127,6 +129,7 @@ def analytics_overview(
                 target=attachment.original_filename,
                 occurred_at=event.downloaded_at,
                 ip_address=event.ip_address,
+                user_agent=event.user_agent,
             )
         )
         top_counts[("attachment", attachment.label, attachment.original_filename)] += 1

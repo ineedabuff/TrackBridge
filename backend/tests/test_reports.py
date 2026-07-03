@@ -64,8 +64,10 @@ def test_send_now_returns_preview_when_smtp_is_not_configured() -> None:
         result = send_response.json()
         assert result["sent"] is False
         assert result["message"] == "SMTP is not configured. Preview generated only."
-        assert "TrackBridge report" in result["subject"]
+        assert "Tracking notification" in result["subject"]
+        assert "Tracking Notification" in result["preview_text"]
         assert "Opens: 1" in result["preview_text"]
+        assert "OPEN TRACKING REPORT" in result["preview_html"]
 
         history_response = client.get("/api/v1/reports/history", headers=headers)
         assert history_response.status_code == 200

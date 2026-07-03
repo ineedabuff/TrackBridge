@@ -281,6 +281,29 @@ function App() {
     return `${(value / 1024 / 1024).toFixed(1)} MB`;
   }
 
+  function formatReportDate(value: string) {
+    return new Date(value).toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  function describeDevice(userAgent: string | null) {
+    if (!userAgent) return "Unknown";
+    const os = userAgent.includes("Windows") ? "Windows" : userAgent.includes("Mac OS") ? "Mac OS" : userAgent.includes("Android") ? "Android" : userAgent.includes("iPhone") ? "iPhone" : "Other";
+    const browser = userAgent.includes("Chrome") ? "Chrome" : userAgent.includes("Safari") ? "Safari" : userAgent.includes("Firefox") ? "Firefox" : userAgent.includes("Outlook") ? "Outlook" : "Browser";
+    return `${browser}, ${os}`;
+  }
+
+  function describeLocation(ipAddress: string | null) {
+    if (!ipAddress) return "Unknown";
+    if (ipAddress === "127.0.0.1" || ipAddress === "::1") return "Localhost";
+    return `IP ${ipAddress}`;
+  }
+
   function logout() {
     localStorage.removeItem("trackbridge_token");
     localStorage.removeItem("trackbridge_user");
@@ -494,6 +517,58 @@ function App() {
                 )}
               </article>
             </div>
+
+            <section className="tracking-report-detail">
+              <div className="report-paper-head">
+                <span>{new Date().toLocaleDateString()}</span>
+                <strong>TrackBridge Tracking Statistics</strong>
+              </div>
+              <div className="report-paper-brand">TrackBridge mail2Cloud</div>
+              <h2>Email Tracking Report</h2>
+              <div className="report-map" aria-label="Activity location overview">
+                {(analytics?.recent_activity ?? []).slice(0, 6).map((item, index) => (
+                  <span
+                    key={`${item.event_type}-${item.occurred_at}-${index}`}
+                    style={{ left: `${18 + (index * 13) % 62}%`, top: `${24 + (index * 19) % 54}%` }}
+                    title={describeLocation(item.ip_address)}
+                  />
+                ))}
+                <strong>{analytics?.totals.total_events ?? 0}</strong>
+              </div>
+              <p className="report-note">Note: Location indicators are IP-based and may not represent the exact recipient location.</p>
+              <div className="report-table-wrap">
+                <table className="report-detail-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Recipient</th>
+                      <th>Type</th>
+                      <th>Location</th>
+                      <th>Device</th>
+                      <th>Object</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(analytics?.recent_activity ?? []).length === 0 ? (
+                      <tr>
+                        <td colSpan={6}>No tracking events yet.</td>
+                      </tr>
+                    ) : (
+                      analytics?.recent_activity.map((item) => (
+                        <tr key={`${item.event_type}-${item.occurred_at}-${item.title}-${item.target}`}>
+                          <td>{formatReportDate(item.occurred_at)}</td>
+                          <td>{item.target}</td>
+                          <td>{item.event_type === "download" ? "File opened" : item.event_type}</td>
+                          <td>{describeLocation(item.ip_address)}</td>
+                          <td>{describeDevice(item.user_agent)}</td>
+                          <td>{item.title}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
             <div className="report-history">
               <h3>Report history</h3>

@@ -32,6 +32,7 @@ class AnalyticsActivityItem(BaseModel):
     target: str
     occurred_at: datetime
     ip_address: str | None
+    user_agent: str | None
 
 
 class AnalyticsTopItem(BaseModel):

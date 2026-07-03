@@ -79,7 +79,8 @@ def send_report_now(
     settings: Settings = Depends(get_settings),
 ) -> ReportSendResult:
     preferences = get_or_create_preferences(db, current_user)
-    subject, text_body, html_body = build_report(current_user, db)
+    dashboard_url = str(settings.public_base_url or settings.frontend_url)
+    subject, text_body, html_body = build_report(current_user, db, dashboard_url)
 
     if not smtp_is_configured(settings):
         return ReportSendResult(
